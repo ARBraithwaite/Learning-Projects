@@ -6,6 +6,7 @@ import nltk
 import re
 import unicodedata
 import string
+from scipy.sparse import csr_matrix
 
 from contractions import CONTRACTION_MAP
 
@@ -174,3 +175,27 @@ def count_pos_type(text, pos: str):
         return len(pos_tagged)
     else:
         return f'{pos} not in  accepted pos types {pos_type.keys()}'
+    
+
+def cooccurrence_matrix(corpus, window_size = 1):
+    vocabulary={}
+    data=[]
+    row=[]
+    col=[]
+    for sentence in corpus:
+        sentence = tokenize(sentence)
+        for pos, token in enumerate(sentence):
+            i = vocabulary.setdefault(token, len(vocabulary))
+            start = max(0, pos-window_size)
+            end = min(len(sentence), pos + (window_size + 1))
+            for pos2 in range(start, end):
+                if pos2 == pos: 
+                    continue
+                j = vocabulary.setdefault(sentence[pos2],len(vocabulary))
+                
+                data.append(1.)
+                row.append(i)
+                col.append(j)
+                
+    cooccurrence_matrix = csr_matrix((data,(row,col)))
+    return vocabulary, cooccurrence_matrix
