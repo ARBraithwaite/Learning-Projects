@@ -7,6 +7,7 @@ import re
 import unicodedata
 import string
 from scipy.sparse import csr_matrix
+import functools
 
 from contractions import CONTRACTION_MAP
 
@@ -58,7 +59,7 @@ def remove_special_characters(text, remove_digits=False):
 
 def remove_stop_words(text, stopwords = spacy_stopwords):
     
-    doc = tokenize(text)
+    doc = text.split()
     
     # filtering stop words
     doc = ' '.join([word for word in doc if word.lower() not in spacy_stopwords])
@@ -66,53 +67,38 @@ def remove_stop_words(text, stopwords = spacy_stopwords):
     return doc
 
 def remove_white_space(text):
-    doc = tokenize(text)
     
-    doc = [word.strip() for word in doc]
-    doc = ' '.join([word for word in doc if word != ''])
-    
+    doc = ' '.join([word for word in text.split()])
     return doc
 
 def remove_accented_chars(text):
     text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8', 'ignore')
     return text
 
-def normalise_text(corpus, All =True, remove_digit=False , expand_contraction=False, remove_special_character=False,\
-                   remove_accented_char=False, lemmatise=False, remove_white_spaces=False, remove_stop_word=False,\
-                   stopword=spacy_stopwords):
-    
+def format_num(text):
+    pattern = "^\d+\s|\s\d+\s|\s\d+$"
+    text = re.sub(pattern, " NUM ", text)
+    return text
+
+def normalise_text(corpus, remove_digit=False, stopword=spacy_stopwords):
+  
     normal_corpus = []
     
     for doc in corpus:
-        if All:
-            
-            text = \
-            remove_stop_words(
-                remove_white_space(
-                    lemmatize(
-                        remove_accented_chars(
-                            remove_special_characters(
-                                expand_contractions(doc), remove_digits=remove_digit
+        text = \
+           lemmatize(
+             remove_stop_words(
+                 remove_white_space(
+                       format_num(
+                         remove_accented_chars(
+                             remove_special_characters(
+                                 expand_contractions(doc), remove_digits=remove_digit
                             )
+                          )
                         )
-                    )
-                )
-            , stopwords = stopword)
-        else:
-                
-            if expand_contraction:
-                text = expand_contractions(doc)
-            if remove_special_character:
-                text = remove_special_characters(doc, remove_digits=remove_digit)
-            if remove_accented_char:
-                text = remove_accented_chars(doc)
-            if lemmatise:
-                text = lemmatize(doc)
-            if remove_white_spaces:
-                text = remove_white_space(doc)
-            if remove_stop_word:
-                text = remove_stop_words(doc)
-    
+                      )
+             , stopwords = stopword)
+             )    
         normal_corpus.append(text)
     
     return normal_corpus
@@ -144,14 +130,14 @@ def get_entities(corpus):
     return entity_frame
 
 def count_punct(text):
-    doc = tokenize(text)
+    doc = text.split()
     
     punctuation = [punct for punct in doc if punct in string.punctuation]
     
     return len(punctuation)
 
 def count_upper(text):
-    doc = tokenize(text)
+    doc = text.split()
     
     upper  =[word for word in doc if word.isupper()]
     
@@ -163,7 +149,6 @@ pos_type = {
     'verb': 'VERB',
     'pronoun': 'PRON',
     'noun': 'NOUN',
-    
 }
 
 def count_pos_type(text, pos: str):
@@ -176,6 +161,10 @@ def count_pos_type(text, pos: str):
     else:
         return f'{pos} not in  accepted pos types {pos_type.keys()}'
     
+def count_entities(text):
+    doc = nlp(text)
+    
+    return len(doc.ents)
 
 def cooccurrence_matrix(corpus, window_size = 1):
     vocabulary={}
@@ -199,3 +188,14 @@ def cooccurrence_matrix(corpus, window_size = 1):
                 
     cooccurrence_matrix = csr_matrix((data,(row,col)))
     return vocabulary, cooccurrence_matrix
+
+def perf_time(func):
+    @functools.wraps(func)
+    def wrap_decorator(*args, **kwargs):
+        start = perf_counter()
+        value = func(*args, **kwargs)
+        end = perf_counter()
+        execution_time = (end - start)
+        print(f'Runtime: {execution_time:.2f}s / {execution_time/60:.2f}mins')
+        return value
+    return wrap_decorator
